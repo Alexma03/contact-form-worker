@@ -1,45 +1,35 @@
-export default {
-    async fetch(request) {
-      if (request.method === "POST") {
-        const formData = await request.formData();
-        const name = formData.get("name");
-        const email = formData.get("email");
-        const phone = formData.get("phone") || "No proporcionado";
-        const company = formData.get("company") || "No proporcionado";
-        const subject = formData.get("subject");
-        const message = formData.get("message");
-        const consent = formData.get("consent");
-  
-        // Validación básica
-        if (!name || !email || !subject || !message || !consent) {
-          return new Response("Faltan campos obligatorios", { status: 400 });
-        }
-  
-        // Construir cuerpo del correo
-        const emailBody = `
-          Nuevo mensaje de contacto:
-          - Nombre: ${name}
-          - Email: ${email}
-          - Teléfono: ${phone}
-          - Empresa: ${company}
-          - Asunto: ${subject}
-          - Mensaje: ${message}
-        `;
-  
-        // Enviar a MailChannels
-        const response = await fetch("https://api.mailchannels.net/tx/v1/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: `${name} <${email}>`,
-            to: "info@amazonboost.agency",
-            subject: `Formulario: ${subject}`,
-            text: emailBody,
-          }),
-        });
-  
-        return new Response("¡Mensaje enviado!", { status: 200 });
-      }
-      return new Response("Método no permitido", { status: 405 });
+import mailchannelsPlugin from "@cloudflare/pages-plugin-mailchannels";
+
+export const onRequest = mailchannelsPlugin({
+  personalizations: [
+    {
+      to: [{ name: "AmazonBoost Agency", email: "info@amazonboost.agency" }],
     },
-  };
+  ],
+  from: { name: "Web Contact", email: "no-reply@amazonboost.agency" },
+  respondWith: ({ formData }) => {
+    // Validation
+    if (!formData.get("name") || 
+        !formData.get("email") || 
+        !formData.get("subject") || 
+        !formData.get("message") || 
+        !formData.get("consent")) {
+      return new Response("Faltan campos obligatorios", { status: 400 });
+    }
+
+    // Successful response with redirect
+    return new Response(null, {
+      status: 302,
+      headers: { Location: "/thank-you" },
+    });
+  },
+  content: async ({ formData }) => ({
+    subject: `Formulario: ${formData.get("subject")}`,
+    text: `Nuevo mensaje de contacto:
+      - Nombre: ${formData.get("name")}
+      - Email: ${formData.get("email")}
+      - Teléfono: ${formData.get("phone") || "No proporcionado"}
+      - Empresa: ${formData.get("company") || "No proporcionado"}
+      - Mensaje: ${formData.get("message")}`
+  })
+});
